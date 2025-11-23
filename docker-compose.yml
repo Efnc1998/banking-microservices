@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  bankingdb:
+    image: postgres:15-alpine
+    container_name: bankingdb
+    environment:
+      POSTGRES_DB: bankingdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - banking_data:/var/lib/postgresql/data
+      - ./BaseDatos.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bankingdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  customer-service:
+    build:
+      context: ./customer-service
+      dockerfile: Dockerfile
+    container_name: customer-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://bankingdb:5432/bankingdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres123
+    depends_on:
+      bankingdb:
+        condition: service_healthy
+    networks:
+      - banking-network
+    restart: on-failure
+
+  account-service:
+    build:
+      context: .
+      dockerfile: account-service/Dockerfile
+    container_name: account-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://bankingdb:5432/bankingdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres123
+      CUSTOMER_SERVICE_URL: http://customer-service:8081
+    depends_on:
+      bankingdb:
+        condition: service_healthy
+      customer-service:
+        condition: service_started
+    networks:
+      - banking-network
+    restart: on-failure
+
+networks:
+  banking-network:
+    driver: bridge
+    name: banking-network
+
+volumes:
+  banking_data:
+    driver: local
+    name: banking_data
