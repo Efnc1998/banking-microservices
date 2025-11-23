@@ -42,7 +42,9 @@ public class PersonRepositoryImpl implements PersonRepository {
     public Mono<Person> findByIdentification(String identification) {
         return Mono.fromCallable(() -> jpaRepository.findByIdentification(identification))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
+                .flatMap(opt -> opt.map(entityMapper::toDomain)
+                        .map(Mono::just)
+                        .orElse(Mono.empty()));
     }
 
     @Override

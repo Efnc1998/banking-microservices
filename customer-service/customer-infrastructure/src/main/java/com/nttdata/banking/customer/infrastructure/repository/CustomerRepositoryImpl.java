@@ -48,9 +48,14 @@ public class CustomerRepositoryImpl implements CustomerRepository {
 
     @Override
     public Mono<Void> deleteByCustomerId(Long customerId) {
-        log.debug("Deleting customer with customerId: {}", customerId);
-        return Mono.fromRunnable(() -> jpaRepository.deleteById(customerId))
+        log.debug("Soft deleting customer with customerId: {}", customerId);
+        return Mono.fromCallable(() -> jpaRepository.findById(customerId))
                 .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entity -> {
+                    entity.setStatus(false);
+                    return Mono.fromCallable(() -> jpaRepository.save(entity))
+                            .subscribeOn(Schedulers.boundedElastic());
+                }).orElse(Mono.empty()))
                 .then();
     }
 

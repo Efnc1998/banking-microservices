@@ -82,7 +82,7 @@ class MovementServiceTest {
     @Test
     @DisplayName("Should create debit transaction and subtract from balance")
     void shouldCreateDebitTransactionAndSubtractFromBalance() {
-        // Given
+        
         when(accountRepository.findByAccountId(1L)).thenReturn(Mono.just(testAccount));
         when(transactionRepository.findLastByAccountId(1L)).thenReturn(Mono.empty());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(Mono.just(savedTransaction));
@@ -105,7 +105,7 @@ class MovementServiceTest {
     @Test
     @DisplayName("Should throw InsufficientFundsException when debit exceeds balance")
     void shouldThrowInsufficientFundsExceptionWhenDebitExceedsBalance() {
-        // Given
+        
         TransactionDto largeDebitDto = TransactionDto.builder()
                 .type("Débito")
                 .amount(new BigDecimal("3000.00"))

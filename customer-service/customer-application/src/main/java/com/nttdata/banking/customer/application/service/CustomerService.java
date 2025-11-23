@@ -1,5 +1,6 @@
 package com.nttdata.banking.customer.application.service;
 
+import com.nttdata.banking.customer.application.exception.CustomerAlreadyExistsException;
 import com.nttdata.banking.customer.application.mapper.CustomerDtoMapper;
 import com.nttdata.banking.customer.domain.model.Customer;
 import com.nttdata.banking.customer.domain.model.Person;
@@ -30,22 +31,31 @@ public class CustomerService {
      *
      * @param dto the customer DTO
      * @return the created customer DTO
+     * @throws CustomerAlreadyExistsException if a customer with the same identification already exists
      */
     public Mono<CustomerDto> createCustomer(CustomerDto dto) {
         log.info("Creating new customer with identification: {}", dto.getPerson().getIdentification());
 
-        Customer customer = customerDtoMapper.toDomain(dto);
-        Person person = customer.getPerson();
+        String identification = dto.getPerson().getIdentification();
 
-        return personRepository.save(person)
-                .flatMap(savedPerson -> {
-                    Customer customerToSave = Customer.builder()
-                            .customerId(dto.getCustomerId())
-                            .person(savedPerson)
-                            .password(customer.getPassword())
-                            .status(customer.getStatus())
-                            .build();
-                    return customerRepository.save(customerToSave);
+        return personRepository.existsByIdentification(identification)
+                .flatMap(exists -> {
+                    if (Boolean.TRUE.equals(exists))
+                        return Mono.error(new CustomerAlreadyExistsException(identification));
+
+                    Customer customer = customerDtoMapper.toDomain(dto);
+                    Person person = customer.getPerson();
+
+                    return personRepository.save(person)
+                            .flatMap(savedPerson -> {
+                                Customer customerToSave = Customer.builder()
+                                        .customerId(dto.getCustomerId())
+                                        .person(savedPerson)
+                                        .password(customer.getPassword())
+                                        .status(customer.getStatus())
+                                        .build();
+                                return customerRepository.save(customerToSave);
+                            });
                 })
                 .map(customerDtoMapper::toDto)
                 .doOnSuccess(c -> log.info("Customer created successfully with customerId: {}", c.getCustomerId()));
@@ -80,16 +90,37 @@ public class CustomerService {
      * @param customerId the customer ID (primary key)
      * @param dto        the updated customer DTO
      * @return the updated customer DTO
+     * @throws CustomerAlreadyExistsException if the new identification already belongs to another customer
      */
     public Mono<CustomerDto> updateCustomer(Long customerId, CustomerDto dto) {
         log.info("Updating customer with customerId: {}", customerId);
 
+        String newIdentification = dto.getPerson().getIdentification();
+
         return customerRepository.findByCustomerId(customerId)
+                .flatMap(existingCustomer -> {
+                    Long currentPersonId = existingCustomer.getPerson().getPersonId();
+                    String currentIdentification = existingCustomer.getPerson().getIdentification();
+
+                    // If identification changed, validate it doesn't belong to another customer
+                    if (!newIdentification.equals(currentIdentification)) {
+                        return personRepository.findByIdentification(newIdentification)
+                                .flatMap(existingPerson -> {
+                                    // Identification exists and belongs to another person
+                                    if (!existingPerson.getPersonId().equals(currentPersonId)) {
+                                        return Mono.error(new CustomerAlreadyExistsException(newIdentification));
+                                    }
+                                    return Mono.just(existingCustomer);
+                                })
+                                .switchIfEmpty(Mono.just(existingCustomer));
+                    }
+                    return Mono.just(existingCustomer);
+                })
                 .flatMap(existingCustomer -> {
                     Person updatedPerson = Person.builder()
                             .personId(existingCustomer.getPerson().getPersonId())
                             .name(dto.getPerson().getName())
-                            .identification(dto.getPerson().getIdentification())
+                            .identification(newIdentification)
                             .address(dto.getPerson().getAddress())
                             .phone(dto.getPerson().getPhone())
                             .build();
@@ -110,19 +141,15 @@ public class CustomerService {
     }
 
     /**
-     * Deletes a customer by customer ID.
+     * Soft deletes a customer by customer ID (sets status to false).
      *
      * @param customerId the customer ID (primary key)
      * @return void mono
      */
     public Mono<Void> deleteCustomer(Long customerId) {
-        log.info("Deleting customer with customerId: {}", customerId);
-        return customerRepository.findByCustomerId(customerId)
-                .flatMap(customer ->
-                    customerRepository.deleteByCustomerId(customerId)
-                        .then(personRepository.deleteByPersonId(customer.getPerson().getPersonId()))
-                )
-                .doOnSuccess(v -> log.info("Customer deleted successfully with customerId: {}", customerId));
+        log.info("Soft deleting customer with customerId: {}", customerId);
+        return customerRepository.deleteByCustomerId(customerId)
+                .doOnSuccess(v -> log.info("Customer soft deleted successfully with customerId: {}", customerId));
     }
 
     /**

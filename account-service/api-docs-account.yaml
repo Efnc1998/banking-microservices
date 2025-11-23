@@ -1,0 +1,465 @@
+openapi: 3.0.1
+info:
+  title: Account Service API
+  description: "API REST para la gestión de cuentas bancarias, movimientos y reportes.\
+    \ Permite crear cuentas, registrar movimientos (débitos/créditos) y generar estados\
+    \ de cuenta."
+  contact:
+    name: Edison Narváez
+    email: efnc1726@outlook.com
+  version: 1.0.0
+servers:
+- url: http://localhost:8082
+  description: Local Development
+- url: http://account-service:8082
+  description: Docker Environment
+paths:
+  /api/v1/movements/{movementId}:
+    get:
+      tags:
+      - movement-controller
+      operationId: getMovementById
+      parameters:
+      - name: movementId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseTransactionDto"
+    put:
+      tags:
+      - movement-controller
+      operationId: updateMovement
+      parameters:
+      - name: movementId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseTransactionDto"
+    delete:
+      tags:
+      - movement-controller
+      operationId: deleteMovement
+      parameters:
+      - name: movementId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseVoid"
+  /api/v1/accounts/{accountId}:
+    get:
+      tags:
+      - account-controller
+      operationId: getAccountById
+      parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseAccountDto"
+    put:
+      tags:
+      - account-controller
+      operationId: updateAccount
+      parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseAccountDto"
+    delete:
+      tags:
+      - account-controller
+      operationId: deleteAccount
+      parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseVoid"
+  /api/v1/movements:
+    get:
+      tags:
+      - movement-controller
+      operationId: getAllMovements
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseListTransactionDto"
+    post:
+      tags:
+      - movement-controller
+      operationId: createMovement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseTransactionDto"
+  /api/v1/accounts:
+    get:
+      tags:
+      - account-controller
+      operationId: getAllAccounts
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseListAccountDto"
+    post:
+      tags:
+      - account-controller
+      operationId: createAccount
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseAccountDto"
+  /api/v1/reports/{clientId}:
+    get:
+      tags:
+      - report-controller
+      operationId: getAccountStatement
+      parameters:
+      - name: clientId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: startDate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: endDate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseListAccountStatementDto"
+  /api/v1/movements/by-account/{accountId}:
+    get:
+      tags:
+      - movement-controller
+      operationId: getMovementsByAccountId
+      parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseListTransactionDto"
+  /api/v1/accounts/by-number/{accountNumber}:
+    get:
+      tags:
+      - account-controller
+      operationId: getAccountByNumber
+      parameters:
+      - name: accountNumber
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseAccountDto"
+  /api/v1/accounts/by-customer/{customerId}:
+    get:
+      tags:
+      - account-controller
+      operationId: getAccountsByCustomerId
+      parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseListAccountDto"
+components:
+  schemas:
+    TransactionDto:
+      required:
+      - accountId
+      - amount
+      - type
+      type: object
+      properties:
+        movementId:
+          type: integer
+          format: int64
+        date:
+          type: string
+          format: date-time
+        type:
+          pattern: ^(Débito|Crédito)$
+          type: string
+        amount:
+          minimum: 0.01
+          exclusiveMinimum: false
+          type: number
+        balance:
+          type: number
+        accountId:
+          type: integer
+          format: int64
+    ResponseTransactionDto:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/TransactionDto"
+        timestamp:
+          type: string
+          format: date-time
+    AccountDto:
+      required:
+      - accountNumber
+      - accountType
+      - customerId
+      - initialBalance
+      type: object
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        accountNumber:
+          maxLength: 20
+          minLength: 0
+          type: string
+        accountType:
+          pattern: ^(Ahorro|Corriente)$
+          type: string
+        initialBalance:
+          minimum: 0.00
+          exclusiveMinimum: false
+          type: number
+        status:
+          type: boolean
+        customerId:
+          type: integer
+          format: int64
+    ResponseAccountDto:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/AccountDto"
+        timestamp:
+          type: string
+          format: date-time
+    AccountStatementDto:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        customerName:
+          type: string
+        accountNumber:
+          type: string
+        accountType:
+          type: string
+        initialBalance:
+          type: number
+        status:
+          type: boolean
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionDetailDto"
+    ResponseListAccountStatementDto:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountStatementDto"
+        timestamp:
+          type: string
+          format: date-time
+    TransactionDetailDto:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        type:
+          type: string
+        amount:
+          type: number
+        balance:
+          type: number
+    ResponseListTransactionDto:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionDto"
+        timestamp:
+          type: string
+          format: date-time
+    ResponseListAccountDto:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountDto"
+        timestamp:
+          type: string
+          format: date-time
+    ResponseVoid:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+        timestamp:
+          type: string
+          format: date-time

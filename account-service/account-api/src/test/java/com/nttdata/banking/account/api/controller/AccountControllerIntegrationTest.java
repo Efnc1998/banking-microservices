@@ -32,7 +32,7 @@ class AccountControllerIntegrationTest {
     @Test
     @DisplayName("Should return all accounts")
     void shouldReturnAllAccounts() {
-        // Given
+
         AccountDto account1 = AccountDto.builder()
                 .accountId(1L)
                 .accountNumber("478758")
@@ -71,7 +71,6 @@ class AccountControllerIntegrationTest {
     @Test
     @DisplayName("Should create account successfully")
     void shouldCreateAccountSuccessfully() {
-        // Given
         AccountDto inputDto = AccountDto.builder()
                 .accountNumber("123456")
                 .accountType("Ahorro")
@@ -107,7 +106,7 @@ class AccountControllerIntegrationTest {
     @Test
     @DisplayName("Should return account by ID")
     void shouldReturnAccountById() {
-        // Given
+
         AccountDto account = AccountDto.builder()
                 .accountId(1L)
                 .accountNumber("478758")
@@ -135,7 +134,7 @@ class AccountControllerIntegrationTest {
     @Test
     @DisplayName("Should return 404 when account not found")
     void shouldReturn404WhenAccountNotFound() {
-        // Given
+
         when(accountService.getAccountById(999L)).thenReturn(Mono.empty());
 
         // When & Then

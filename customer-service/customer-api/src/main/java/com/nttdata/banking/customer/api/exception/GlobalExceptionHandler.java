@@ -1,5 +1,6 @@
 package com.nttdata.banking.customer.api.exception;
 
+import com.nttdata.banking.customer.application.exception.CustomerAlreadyExistsException;
 import com.nttdata.banking.customer.dto.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -42,7 +43,15 @@ public class GlobalExceptionHandler {
         log.error("Validation error: {}", errors);
         return Mono.just(ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(Response.badRequest("Validation error: " + errors)));
+                .body(Response.badRequest(errors)));
+    }
+
+    @ExceptionHandler(CustomerAlreadyExistsException.class)
+    public Mono<ResponseEntity<Response<Void>>> handleCustomerAlreadyExistsException(CustomerAlreadyExistsException ex) {
+        log.error("Customer already exists: {}", ex.getMessage());
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(Response.conflict(ex.getMessage())));
     }
 
     @ExceptionHandler(Exception.class)

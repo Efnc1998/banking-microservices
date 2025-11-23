@@ -1,5 +1,6 @@
 package com.nttdata.banking.account.api.exception;
 
+import com.nttdata.banking.account.application.exception.AccountNumberAlreadyExistsException;
 import com.nttdata.banking.account.application.exception.BusinessException;
 import com.nttdata.banking.account.application.exception.InsufficientFundsException;
 import com.nttdata.banking.account.dto.Response;
@@ -52,7 +53,15 @@ public class GlobalExceptionHandler {
         log.error("Validation error: {}", errors);
         return Mono.just(ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(Response.badRequest("Validation error: " + errors)));
+                .body(Response.badRequest(errors)));
+    }
+
+    @ExceptionHandler(AccountNumberAlreadyExistsException.class)
+    public Mono<ResponseEntity<Response<Void>>> handleAccountNumberAlreadyExistsException(AccountNumberAlreadyExistsException ex) {
+        log.error("Account number already exists: {}", ex.getMessage());
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(Response.conflict(ex.getMessage())));
     }
 
     @ExceptionHandler(Exception.class)

@@ -63,9 +63,14 @@ public class AccountRepositoryImpl implements AccountRepository {
 
     @Override
     public Mono<Void> deleteByAccountId(Long accountId) {
-        log.debug("Deleting account with accountId: {}", accountId);
-        return Mono.fromRunnable(() -> jpaRepository.deleteById(accountId))
+        log.debug("Soft deleting account with accountId: {}", accountId);
+        return Mono.fromCallable(() -> jpaRepository.findById(accountId))
                 .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entity -> {
+                    entity.setStatus(false);
+                    return Mono.fromCallable(() -> jpaRepository.save(entity))
+                            .subscribeOn(Schedulers.boundedElastic());
+                }).orElse(Mono.empty()))
                 .then();
     }
 

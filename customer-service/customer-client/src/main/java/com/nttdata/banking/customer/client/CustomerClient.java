@@ -5,8 +5,10 @@ import com.nttdata.banking.customer.dto.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 /**
@@ -37,7 +39,14 @@ public class CustomerClient {
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<Response<CustomerDto>>() {})
                 .map(Response::getData)
-                .doOnError(error -> log.error("Error fetching customer: {}", error.getMessage()));
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+                        log.debug("Customer not found with customerId: {}", customerId);
+                        return Mono.empty();
+                    }
+                    log.error("Error fetching customer: {}", ex.getMessage());
+                    return Mono.error(ex);
+                });
     }
 
     /**

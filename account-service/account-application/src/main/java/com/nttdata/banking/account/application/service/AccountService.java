@@ -1,5 +1,6 @@
 package com.nttdata.banking.account.application.service;
 
+import com.nttdata.banking.account.application.exception.AccountNumberAlreadyExistsException;
 import com.nttdata.banking.account.application.exception.BusinessException;
 import com.nttdata.banking.account.application.mapper.AccountDtoMapper;
 import com.nttdata.banking.account.domain.model.Account;
@@ -33,6 +34,7 @@ public class AccountService {
      *
      * @param dto the account DTO
      * @return the created account DTO
+     * @throws AccountNumberAlreadyExistsException if an account with the same number already exists
      */
     public Mono<AccountDto> createAccount(AccountDto dto) {
         log.info("Creating new account for customer: {}", dto.getCustomerId());
@@ -42,9 +44,17 @@ public class AccountService {
                     "Invalid account type: " + dto.getAccountType() + ". Must be 'Ahorro' or 'Corriente'"));
         }
 
-        return customerClient.existsByCustomerId(dto.getCustomerId())
-                .flatMap(exists -> {
-                    if (Boolean.FALSE.equals(exists)) {
+        String accountNumber = dto.getAccountNumber();
+
+        return accountRepository.existsByAccountNumber(accountNumber)
+                .flatMap(accountExists -> {
+                    if (accountExists) {
+                        return Mono.error(new AccountNumberAlreadyExistsException(accountNumber));
+                    }
+                    return customerClient.existsByCustomerId(dto.getCustomerId());
+                })
+                .flatMap(customerExists -> {
+                    if (Boolean.FALSE.equals(customerExists)) {
                         return Mono.error(new BusinessException("Customer not found with id: " + dto.getCustomerId()));
                     }
                     Account account = accountDtoMapper.toDomain(dto);
@@ -107,6 +117,7 @@ public class AccountService {
      * @param accountId the account ID (primary key)
      * @param dto       the updated account DTO
      * @return the updated account DTO
+     * @throws AccountNumberAlreadyExistsException if the new account number already belongs to another account
      */
     public Mono<AccountDto> updateAccount(Long accountId, AccountDto dto) {
         log.info("Updating account with accountId: {}", accountId);
@@ -117,6 +128,24 @@ public class AccountService {
         }
 
         return accountRepository.findByAccountId(accountId)
+                .flatMap(existingAccount -> {
+                    String newAccountNumber = dto.getAccountNumber() != null ? dto.getAccountNumber() : existingAccount.getAccountNumber();
+                    String currentAccountNumber = existingAccount.getAccountNumber();
+
+                    // If account number changed, validate it doesn't belong to another account
+                    if (!newAccountNumber.equals(currentAccountNumber)) {
+                        return accountRepository.findByAccountNumber(newAccountNumber)
+                                .flatMap(existingWithNumber -> {
+                                    // Account number exists and belongs to another account
+                                    if (!existingWithNumber.getAccountId().equals(accountId)) {
+                                        return Mono.error(new AccountNumberAlreadyExistsException(newAccountNumber));
+                                    }
+                                    return Mono.just(existingAccount);
+                                })
+                                .switchIfEmpty(Mono.just(existingAccount));
+                    }
+                    return Mono.just(existingAccount);
+                })
                 .flatMap(existingAccount -> {
                     Account accountToUpdate = Account.builder()
                             .accountId(accountId)
@@ -133,15 +162,15 @@ public class AccountService {
     }
 
     /**
-     * Deletes an account by account ID.
+     * Soft deletes an account by account ID (sets status to false).
      *
      * @param accountId the account ID (primary key)
      * @return void mono
      */
     public Mono<Void> deleteAccount(Long accountId) {
-        log.info("Deleting account with accountId: {}", accountId);
+        log.info("Soft deleting account with accountId: {}", accountId);
         return accountRepository.deleteByAccountId(accountId)
-                .doOnSuccess(v -> log.info("Account deleted successfully with accountId: {}", accountId));
+                .doOnSuccess(v -> log.info("Account soft deleted successfully with accountId: {}", accountId));
     }
 
     private boolean isValidAccountType(String accountType) {

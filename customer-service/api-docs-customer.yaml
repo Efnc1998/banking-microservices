@@ -1,0 +1,228 @@
+openapi: 3.0.1
+info:
+  title: Customer Service API
+  description: "API REST para la gestión de clientes del sistema bancario. Permite\
+    \ crear, consultar, actualizar y eliminar clientes."
+  contact:
+    name: Edison Narváez
+    email: efnc1726@outlook.com
+  version: 1.0.0
+servers:
+- url: http://localhost:8081
+  description: Local Development
+- url: http://customer-service:8081
+  description: Docker Environment
+paths:
+  /api/v1/customers/{customerId}:
+    get:
+      tags:
+      - customer-controller
+      operationId: getCustomerByCustomerId
+      parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseCustomerDto"
+    put:
+      tags:
+      - customer-controller
+      operationId: updateCustomer
+      parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseCustomerDto"
+    delete:
+      tags:
+      - customer-controller
+      operationId: deleteCustomer
+      parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseVoid"
+  /api/v1/customers:
+    get:
+      tags:
+      - customer-controller
+      operationId: getAllCustomers
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseListCustomerDto"
+    post:
+      tags:
+      - customer-controller
+      operationId: createCustomer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseCustomerDto"
+  /api/v1/customers/exists/{customerId}:
+    get:
+      tags:
+      - customer-controller
+      operationId: existsByCustomerId
+      parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResponseBoolean"
+components:
+  schemas:
+    CustomerDto:
+      required:
+      - password
+      - person
+      type: object
+      properties:
+        customerId:
+          type: integer
+          format: int64
+        person:
+          $ref: "#/components/schemas/PersonDto"
+        password:
+          type: string
+        status:
+          type: boolean
+    PersonDto:
+      required:
+      - identification
+      - name
+      type: object
+      properties:
+        personId:
+          type: integer
+          format: int64
+        name:
+          maxLength: 100
+          minLength: 0
+          type: string
+        identification:
+          maxLength: 20
+          minLength: 0
+          type: string
+        address:
+          maxLength: 255
+          minLength: 0
+          type: string
+        phone:
+          maxLength: 20
+          minLength: 0
+          type: string
+    ResponseCustomerDto:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/CustomerDto"
+        timestamp:
+          type: string
+          format: date-time
+    ResponseListCustomerDto:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerDto"
+        timestamp:
+          type: string
+          format: date-time
+    ResponseBoolean:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+    ResponseVoid:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
