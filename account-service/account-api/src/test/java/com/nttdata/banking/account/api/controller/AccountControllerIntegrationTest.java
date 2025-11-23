@@ -60,7 +60,8 @@ class AccountControllerIntegrationTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.success").isEqualTo(true)
+                .jsonPath("$.statusCode").isEqualTo(200)
+                .jsonPath("$.status").isEqualTo("Ok")
                 .jsonPath("$.data").isArray()
                 .jsonPath("$.data.length()").isEqualTo(2)
                 .jsonPath("$.data[0].accountNumber").isEqualTo("478758")
@@ -97,9 +98,9 @@ class AccountControllerIntegrationTest {
                 .exchange()
                 .expectStatus().isCreated()
                 .expectBody()
-                .jsonPath("$.success").isEqualTo(true)
-                .jsonPath("$.message").isEqualTo("Account created successfully")
-                .jsonPath("$.data.id").isEqualTo(1)
+                .jsonPath("$.statusCode").isEqualTo(201)
+                .jsonPath("$.status").isEqualTo("Created")
+                .jsonPath("$.data.accountId").isEqualTo(1)
                 .jsonPath("$.data.accountNumber").isEqualTo("123456");
     }
 
@@ -125,8 +126,8 @@ class AccountControllerIntegrationTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.success").isEqualTo(true)
-                .jsonPath("$.data.id").isEqualTo(1)
+                .jsonPath("$.statusCode").isEqualTo(200)
+                .jsonPath("$.data.accountId").isEqualTo(1)
                 .jsonPath("$.data.accountNumber").isEqualTo("478758")
                 .jsonPath("$.data.accountType").isEqualTo("Ahorro");
     }
@@ -144,6 +145,6 @@ class AccountControllerIntegrationTest {
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody()
-                .jsonPath("$.success").isEqualTo(false);
+                .jsonPath("$.statusCode").isEqualTo(404);
     }
 }

@@ -2,7 +2,6 @@ package com.nttdata.banking.account.infrastructure.repository;
 
 import com.nttdata.banking.account.domain.model.Account;
 import com.nttdata.banking.account.domain.repository.AccountRepository;
-import com.nttdata.banking.account.infrastructure.entity.AccountEntity;
 import com.nttdata.banking.account.infrastructure.jpa.AccountJpaRepository;
 import com.nttdata.banking.account.infrastructure.mapper.AccountEntityMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +12,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Implementation of AccountRepository using JPA adapted for WebFlux.
- * Converts between Domain Model and Entity, never exposes Entity outside.
+ * Implementation of AccountRepository using JPA.
+ * Wraps blocking JPA calls with Schedulers.boundedElastic() for WebFlux compatibility.
  */
 @Slf4j
 @Repository
@@ -26,28 +25,24 @@ public class AccountRepositoryImpl implements AccountRepository {
 
     @Override
     public Mono<Account> save(Account account) {
-        return Mono.fromCallable(() -> {
-            log.debug("Saving account with number: {}", account.getAccountNumber());
-            AccountEntity entity = entityMapper.toEntity(account);
-            AccountEntity saved = jpaRepository.save(entity);
-            return entityMapper.toDomain(saved);
-        }).subscribeOn(Schedulers.boundedElastic());
+        log.debug("Saving account with number: {}", account.getAccountNumber());
+        return Mono.fromCallable(() -> jpaRepository.save(entityMapper.toEntity(account)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(entityMapper::toDomain);
     }
 
     @Override
     public Mono<Account> findByAccountId(Long accountId) {
-        return Mono.fromCallable(() -> jpaRepository.findById(accountId)
-                        .map(entityMapper::toDomain)
-                        .orElse(null))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> jpaRepository.findById(accountId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
     }
 
     @Override
     public Mono<Account> findByAccountNumber(String accountNumber) {
-        return Mono.fromCallable(() -> jpaRepository.findByAccountNumber(accountNumber)
-                        .map(entityMapper::toDomain)
-                        .orElse(null))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> jpaRepository.findByAccountNumber(accountNumber))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
     }
 
     @Override
@@ -60,7 +55,7 @@ public class AccountRepositoryImpl implements AccountRepository {
 
     @Override
     public Flux<Account> findAll() {
-        return Mono.fromCallable(() -> jpaRepository.findAll())
+        return Mono.fromCallable(jpaRepository::findAll)
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(Flux::fromIterable)
                 .map(entityMapper::toDomain);
@@ -68,10 +63,10 @@ public class AccountRepositoryImpl implements AccountRepository {
 
     @Override
     public Mono<Void> deleteByAccountId(Long accountId) {
-        return Mono.fromRunnable(() -> {
-            log.debug("Deleting account with accountId: {}", accountId);
-            jpaRepository.deleteById(accountId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        log.debug("Deleting account with accountId: {}", accountId);
+        return Mono.fromRunnable(() -> jpaRepository.deleteById(accountId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
     }
 
     @Override

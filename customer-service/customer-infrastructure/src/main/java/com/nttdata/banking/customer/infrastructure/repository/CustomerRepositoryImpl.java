@@ -2,7 +2,6 @@ package com.nttdata.banking.customer.infrastructure.repository;
 
 import com.nttdata.banking.customer.domain.model.Customer;
 import com.nttdata.banking.customer.domain.repository.CustomerRepository;
-import com.nttdata.banking.customer.infrastructure.entity.CustomerEntity;
 import com.nttdata.banking.customer.infrastructure.jpa.CustomerJpaRepository;
 import com.nttdata.banking.customer.infrastructure.mapper.CustomerEntityMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +12,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Implementation of CustomerRepository using JPA adapted for WebFlux.
- * Converts between Domain Model and Entity, never exposes Entity outside.
+ * Implementation of CustomerRepository using JPA.
+ * Wraps blocking JPA calls with Schedulers.boundedElastic() for WebFlux compatibility.
  */
 @Slf4j
 @Repository
@@ -26,25 +25,22 @@ public class CustomerRepositoryImpl implements CustomerRepository {
 
     @Override
     public Mono<Customer> save(Customer customer) {
-        return Mono.fromCallable(() -> {
-            log.debug("Saving customer with customerId: {}", customer.getCustomerId());
-            CustomerEntity entity = entityMapper.toEntity(customer);
-            CustomerEntity saved = jpaRepository.save(entity);
-            return entityMapper.toDomain(saved);
-        }).subscribeOn(Schedulers.boundedElastic());
+        log.debug("Saving customer with customerId: {}", customer.getCustomerId());
+        return Mono.fromCallable(() -> jpaRepository.save(entityMapper.toEntity(customer)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(entityMapper::toDomain);
     }
 
     @Override
     public Mono<Customer> findByCustomerId(Long customerId) {
-        return Mono.fromCallable(() -> jpaRepository.findById(customerId)
-                        .map(entityMapper::toDomain)
-                        .orElse(null))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> jpaRepository.findById(customerId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
     }
 
     @Override
     public Flux<Customer> findAll() {
-        return Mono.fromCallable(() -> jpaRepository.findAll())
+        return Mono.fromCallable(jpaRepository::findAll)
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(Flux::fromIterable)
                 .map(entityMapper::toDomain);
@@ -52,10 +48,10 @@ public class CustomerRepositoryImpl implements CustomerRepository {
 
     @Override
     public Mono<Void> deleteByCustomerId(Long customerId) {
-        return Mono.fromRunnable(() -> {
-            log.debug("Deleting customer with customerId: {}", customerId);
-            jpaRepository.deleteById(customerId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        log.debug("Deleting customer with customerId: {}", customerId);
+        return Mono.fromRunnable(() -> jpaRepository.deleteById(customerId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
     }
 
     @Override

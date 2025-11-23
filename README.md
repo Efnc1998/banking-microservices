@@ -61,7 +61,7 @@ banking-microservices/
 
 ## Tecnologías
 
-| Tecnología | Versión | Propósito | 
+| Tecnología | Versión | Propósito |
 |------------|---------|-----------|
 | Java | 17 | Lenguaje de programación |
 | Spring Boot | 3.4.0 | Framework principal |

@@ -2,7 +2,6 @@ package com.nttdata.banking.account.infrastructure.repository;
 
 import com.nttdata.banking.account.domain.model.Transaction;
 import com.nttdata.banking.account.domain.repository.TransactionRepository;
-import com.nttdata.banking.account.infrastructure.entity.TransactionEntity;
 import com.nttdata.banking.account.infrastructure.jpa.TransactionJpaRepository;
 import com.nttdata.banking.account.infrastructure.mapper.TransactionEntityMapper;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +14,8 @@ import reactor.core.scheduler.Schedulers;
 import java.time.LocalDateTime;
 
 /**
- * Implementation of TransactionRepository using JPA adapted for WebFlux.
- * Converts between Domain Model and Entity, never exposes Entity outside.
+ * Implementation of TransactionRepository using JPA.
+ * Wraps blocking JPA calls with Schedulers.boundedElastic() for WebFlux compatibility.
  */
 @Slf4j
 @Repository
@@ -28,20 +27,17 @@ public class TransactionRepositoryImpl implements TransactionRepository {
 
     @Override
     public Mono<Transaction> save(Transaction transaction) {
-        return Mono.fromCallable(() -> {
-            log.debug("Saving transaction for account: {}", transaction.getAccountId());
-            TransactionEntity entity = entityMapper.toEntity(transaction);
-            TransactionEntity saved = jpaRepository.save(entity);
-            return entityMapper.toDomain(saved);
-        }).subscribeOn(Schedulers.boundedElastic());
+        log.debug("Saving transaction for account: {}", transaction.getAccountId());
+        return Mono.fromCallable(() -> jpaRepository.save(entityMapper.toEntity(transaction)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(entityMapper::toDomain);
     }
 
     @Override
     public Mono<Transaction> findById(Long id) {
-        return Mono.fromCallable(() -> jpaRepository.findById(id)
-                        .map(entityMapper::toDomain)
-                        .orElse(null))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> jpaRepository.findById(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
     }
 
     @Override
@@ -62,7 +58,7 @@ public class TransactionRepositoryImpl implements TransactionRepository {
 
     @Override
     public Flux<Transaction> findAll() {
-        return Mono.fromCallable(() -> jpaRepository.findAll())
+        return Mono.fromCallable(jpaRepository::findAll)
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(Flux::fromIterable)
                 .map(entityMapper::toDomain);
@@ -70,17 +66,16 @@ public class TransactionRepositoryImpl implements TransactionRepository {
 
     @Override
     public Mono<Void> deleteById(Long id) {
-        return Mono.fromRunnable(() -> {
-            log.debug("Deleting transaction with id: {}", id);
-            jpaRepository.deleteById(id);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        log.debug("Deleting transaction with id: {}", id);
+        return Mono.fromRunnable(() -> jpaRepository.deleteById(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
     }
 
     @Override
     public Mono<Transaction> findLastByAccountId(Long accountId) {
-        return Mono.fromCallable(() -> jpaRepository.findLastByAccountId(accountId)
-                        .map(entityMapper::toDomain)
-                        .orElse(null))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> jpaRepository.findFirstByAccountIdOrderByDateDescMovementIdDesc(accountId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
     }
 }

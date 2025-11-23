@@ -2,7 +2,6 @@ package com.nttdata.banking.customer.infrastructure.repository;
 
 import com.nttdata.banking.customer.domain.model.Person;
 import com.nttdata.banking.customer.domain.repository.PersonRepository;
-import com.nttdata.banking.customer.infrastructure.entity.PersonEntity;
 import com.nttdata.banking.customer.infrastructure.jpa.PersonJpaRepository;
 import com.nttdata.banking.customer.infrastructure.mapper.PersonEntityMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +12,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Implementation of PersonRepository using JPA adapted for WebFlux.
- * Converts between Domain Model and Entity, never exposes Entity outside.
+ * Implementation of PersonRepository using JPA.
+ * Wraps blocking JPA calls with Schedulers.boundedElastic() for WebFlux compatibility.
  */
 @Slf4j
 @Repository
@@ -26,28 +25,24 @@ public class PersonRepositoryImpl implements PersonRepository {
 
     @Override
     public Mono<Person> save(Person person) {
-        return Mono.fromCallable(() -> {
-            log.debug("Saving person with identification: {}", person.getIdentification());
-            PersonEntity entity = entityMapper.toEntity(person);
-            PersonEntity saved = jpaRepository.save(entity);
-            return entityMapper.toDomain(saved);
-        }).subscribeOn(Schedulers.boundedElastic());
+        log.debug("Saving person with identification: {}", person.getIdentification());
+        return Mono.fromCallable(() -> jpaRepository.save(entityMapper.toEntity(person)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(entityMapper::toDomain);
     }
 
     @Override
     public Mono<Person> findByPersonId(Long personId) {
-        return Mono.fromCallable(() -> jpaRepository.findById(personId)
-                        .map(entityMapper::toDomain)
-                        .orElse(null))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> jpaRepository.findById(personId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
     }
 
     @Override
     public Mono<Person> findByIdentification(String identification) {
-        return Mono.fromCallable(() -> jpaRepository.findByIdentification(identification)
-                        .map(entityMapper::toDomain)
-                        .orElse(null))
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> jpaRepository.findByIdentification(identification))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
     }
 
     @Override
@@ -60,10 +55,10 @@ public class PersonRepositoryImpl implements PersonRepository {
 
     @Override
     public Mono<Void> deleteByPersonId(Long personId) {
-        return Mono.fromRunnable(() -> {
-            log.debug("Deleting person with personId: {}", personId);
-            jpaRepository.deleteById(personId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        log.debug("Deleting person with personId: {}", personId);
+        return Mono.fromRunnable(() -> jpaRepository.deleteById(personId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
     }
 
     @Override

@@ -37,8 +37,4 @@ public class TransactionEntity {
 
     @Column(name = "account_id", nullable = false)
     private Long accountId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false, insertable = false, updatable = false)
-    private AccountEntity account;
 }
