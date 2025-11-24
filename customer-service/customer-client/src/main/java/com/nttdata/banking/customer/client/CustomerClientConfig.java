@@ -7,6 +7,6 @@ import org.springframework.context.annotation.Configuration;
  * Configuration class for customer client module.
  */
 @Configuration
-@ComponentScan(basePackages = "com.nttdata.banking.customer.client")
+@ComponentScan(basePackages = "com.nttdata.banking.customer.client") // search client
 public class CustomerClientConfig {
 }

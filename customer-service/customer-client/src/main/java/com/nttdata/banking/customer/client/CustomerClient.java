@@ -20,6 +20,7 @@ public class CustomerClient {
 
     private final WebClient webClient;
 
+    // Read property customer.service.url from application.yml
     public CustomerClient(@Value("${customer.service.url:http://localhost:8081}") String customerServiceUrl) {
         this.webClient = WebClient.builder()
                 .baseUrl(customerServiceUrl)
@@ -37,7 +38,7 @@ public class CustomerClient {
         return webClient.get()
                 .uri("/api/v1/customers/{customerId}", customerId)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Response<CustomerDto>>() {})
+                .bodyToMono(new ParameterizedTypeReference<Response<CustomerDto>>() {}) // Parse response JSON to Response<CustomerDto>
                 .map(Response::getData)
                 .onErrorResume(WebClientResponseException.class, ex -> {
                     if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {

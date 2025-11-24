@@ -35,14 +35,17 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     public Mono<Customer> findByCustomerId(Long customerId) {
         return Mono.fromCallable(() -> jpaRepository.findById(customerId))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(opt -> opt.map(entityMapper::toDomain).map(Mono::just).orElse(Mono.empty()));
+                .flatMap(opt -> opt
+                        .map(entityMapper::toDomain)
+                        .map(Mono::just)// Convierte Optional<Customer> → Optional<Mono<Customer>>
+                        .orElse(Mono.empty()));
     }
 
     @Override
     public Flux<Customer> findAll() {
         return Mono.fromCallable(jpaRepository::findAll)
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(Flux::fromIterable)
+                .flatMapMany(Flux::fromIterable) // Convierte Mono en Flux
                 .map(entityMapper::toDomain);
     }
 
@@ -56,7 +59,7 @@ public class CustomerRepositoryImpl implements CustomerRepository {
                     return Mono.fromCallable(() -> jpaRepository.save(entity))
                             .subscribeOn(Schedulers.boundedElastic());
                 }).orElse(Mono.empty()))
-                .then();
+                .then(); // return void
     }
 
     @Override

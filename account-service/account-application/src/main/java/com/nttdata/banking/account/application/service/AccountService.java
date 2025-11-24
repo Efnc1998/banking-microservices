@@ -48,7 +48,7 @@ public class AccountService {
 
         return accountRepository.existsByAccountNumber(accountNumber)
                 .flatMap(accountExists -> {
-                    if (accountExists) {
+                    if (Boolean.TRUE.equals(accountExists)) {
                         return Mono.error(new AccountNumberAlreadyExistsException(accountNumber));
                     }
                     return customerClient.existsByCustomerId(dto.getCustomerId());
@@ -122,43 +122,59 @@ public class AccountService {
     public Mono<AccountDto> updateAccount(Long accountId, AccountDto dto) {
         log.info("Updating account with accountId: {}", accountId);
 
-        if (dto.getAccountType() != null && !isValidAccountType(dto.getAccountType())) {
-            return Mono.error(new BusinessException(
-                    "Invalid account type: " + dto.getAccountType() + ". Must be 'Ahorro' or 'Corriente'"));
-        }
-
-        return accountRepository.findByAccountId(accountId)
-                .flatMap(existingAccount -> {
-                    String newAccountNumber = dto.getAccountNumber() != null ? dto.getAccountNumber() : existingAccount.getAccountNumber();
-                    String currentAccountNumber = existingAccount.getAccountNumber();
-
-                    // If account number changed, validate it doesn't belong to another account
-                    if (!newAccountNumber.equals(currentAccountNumber)) {
-                        return accountRepository.findByAccountNumber(newAccountNumber)
-                                .flatMap(existingWithNumber -> {
-                                    // Account number exists and belongs to another account
-                                    if (!existingWithNumber.getAccountId().equals(accountId)) {
-                                        return Mono.error(new AccountNumberAlreadyExistsException(newAccountNumber));
-                                    }
-                                    return Mono.just(existingAccount);
-                                })
-                                .switchIfEmpty(Mono.just(existingAccount));
-                    }
-                    return Mono.just(existingAccount);
-                })
-                .flatMap(existingAccount -> {
-                    Account accountToUpdate = Account.builder()
-                            .accountId(accountId)
-                            .accountNumber(dto.getAccountNumber() != null ? dto.getAccountNumber() : existingAccount.getAccountNumber())
-                            .accountType(dto.getAccountType() != null ? dto.getAccountType() : existingAccount.getAccountType())
-                            .initialBalance(dto.getInitialBalance() != null ? dto.getInitialBalance() : existingAccount.getInitialBalance())
-                            .status(dto.getStatus() != null ? dto.getStatus() : existingAccount.getStatus())
-                            .customerId(existingAccount.getCustomerId())
-                            .build();
-                    return accountRepository.save(accountToUpdate);
-                })
+        return validateAccountTypeIfPresent(dto.getAccountType())
+                .then(accountRepository.findByAccountId(accountId))
+                .flatMap(existingAccount -> validateAccountNumberChange(accountId, dto, existingAccount))
+                .flatMap(existingAccount -> saveUpdatedAccount(accountId, dto, existingAccount))
                 .map(accountDtoMapper::toDto)
                 .doOnSuccess(a -> log.info("Account updated successfully with accountId: {}", a.getAccountId()));
+    }
+
+    private Mono<Void> validateAccountTypeIfPresent(String accountType) {
+        if (accountType != null && !isValidAccountType(accountType)) {
+            return Mono.error(new BusinessException(
+                    "Invalid account type: " + accountType + ". Must be 'Ahorro' or 'Corriente'"));
+        }
+        return Mono.empty();
+    }
+
+    private Mono<Account> validateAccountNumberChange(Long accountId, AccountDto dto, Account existingAccount) {
+        String newAccountNumber = getValueOrDefault(dto.getAccountNumber(), existingAccount.getAccountNumber());
+        String currentAccountNumber = existingAccount.getAccountNumber();
+
+        if (newAccountNumber.equals(currentAccountNumber)) return Mono.just(existingAccount);
+
+        return accountRepository.findByAccountNumber(newAccountNumber)
+                .flatMap(existingWithNumber -> handleExistingAccountNumber(accountId, newAccountNumber, existingAccount, existingWithNumber))
+                .switchIfEmpty(Mono.just(existingAccount));
+    }
+
+    private Mono<Account> handleExistingAccountNumber(Long accountId, String newAccountNumber,
+                                                      Account existingAccount, Account existingWithNumber) {
+        if (!existingWithNumber.getAccountId().equals(accountId)) {
+            return Mono.error(new AccountNumberAlreadyExistsException(newAccountNumber));
+        }
+        return Mono.just(existingAccount);
+    }
+
+    private Mono<Account> saveUpdatedAccount(Long accountId, AccountDto dto, Account existingAccount) {
+        Account accountToUpdate = buildUpdatedAccount(accountId, dto, existingAccount);
+        return accountRepository.save(accountToUpdate);
+    }
+
+    private Account buildUpdatedAccount(Long accountId, AccountDto dto, Account existingAccount) {
+        return Account.builder()
+                .accountId(accountId)
+                .accountNumber(getValueOrDefault(dto.getAccountNumber(), existingAccount.getAccountNumber()))
+                .accountType(getValueOrDefault(dto.getAccountType(), existingAccount.getAccountType()))
+                .initialBalance(getValueOrDefault(dto.getInitialBalance(), existingAccount.getInitialBalance()))
+                .status(getValueOrDefault(dto.getStatus(), existingAccount.getStatus()))
+                .customerId(existingAccount.getCustomerId())
+                .build();
+    }
+
+    private <T> T getValueOrDefault(T newValue, T defaultValue) {
+        return newValue != null ? newValue : defaultValue;
     }
 
     /**
